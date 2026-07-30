@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BottomTabs } from "@/components/BottomTabs";
+
 export default function EscanearScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [lastCode, setLastCode] = useState("");
@@ -57,6 +59,7 @@ export default function EscanearScreen() {
           </Pressable>
         ) : null}
       </View>
+      <BottomTabs />
     </SafeAreaView>
   );
 }

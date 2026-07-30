@@ -1,11 +1,14 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BottomTabs } from "@/components/BottomTabs";
+import { getBusinessImage } from "@/lib/business-images";
 import { getBusinesses, type BusinessSummary } from "@/lib/loyloop-data";
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [businesses, setBusinesses] = useState<BusinessSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,15 +24,11 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>Hola</Text>
-            <Text style={styles.title}>Tus comercios</Text>
-          </View>
-          <Link href="/login" asChild>
-            <Pressable style={styles.loginButton}>
-              <Text style={styles.loginText}>Entrar</Text>
-            </Pressable>
-          </Link>
+          <Text style={styles.eyebrow}>Hola</Text>
+          <Pressable style={styles.loginButton} onPress={() => router.push("/login")}>
+            <Text style={styles.loginText}>Entrar</Text>
+          </Pressable>
+          <Text style={styles.title}>Tus comercios</Text>
         </View>
 
         <View style={styles.hero}>
@@ -49,7 +48,8 @@ export default function HomeScreen() {
         {businesses.map((business) => (
           <Link key={business.id} href={`/comercio/${business.slug}`} asChild>
             <Pressable style={styles.businessCard}>
-              <View>
+              <Image source={getBusinessImage(business.slug)} style={styles.businessImage} />
+              <View style={styles.businessInfo}>
                 <Text style={styles.businessName}>{business.name}</Text>
                 <Text style={styles.businessMeta}>{business.category}</Text>
               </View>
@@ -61,6 +61,7 @@ export default function HomeScreen() {
           </Link>
         ))}
       </ScrollView>
+      <BottomTabs />
     </SafeAreaView>
   );
 }
@@ -73,12 +74,11 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 110,
-    gap: 16,
+    gap: 12,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    position: "relative",
+    minHeight: 64,
   },
   eyebrow: {
     color: "#64748b",
@@ -86,11 +86,15 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   title: {
+    marginTop: 6,
     color: "#071225",
     fontSize: 30,
     fontWeight: "900",
   },
   loginButton: {
+    position: "absolute",
+    top: 0,
+    right: 0,
     borderRadius: 12,
     backgroundColor: "#0d6efd",
     paddingHorizontal: 16,
@@ -139,6 +143,16 @@ const styles = StyleSheet.create({
     borderColor: "#dbe4f0",
     backgroundColor: "#ffffff",
     padding: 16,
+    gap: 16,
+  },
+  businessImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: "#e2e8f0",
+  },
+  businessInfo: {
+    flex: 1,
   },
   businessName: {
     color: "#071225",

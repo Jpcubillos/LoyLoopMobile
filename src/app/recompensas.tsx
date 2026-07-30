@@ -2,8 +2,20 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BottomTabs } from "@/components/BottomTabs";
+import type { LoyIconName } from "@/components/LoyIcon";
 import { RewardCard } from "@/components/RewardCard";
 import { getRewards, type RewardSummary } from "@/lib/loyloop-data";
+
+function getRewardVisual(reward: RewardSummary): { icon: LoyIconName; tone: "blue" | "green" | "amber" } {
+  const title = reward.title.toLowerCase();
+  const meta = reward.meta.toLowerCase();
+
+  if (title.includes("descuento") || meta.includes("%")) return { icon: "percent", tone: "blue" };
+  if (title.includes("credito") || meta.includes("$")) return { icon: "wallet", tone: "green" };
+  if (title.includes("puntos") || meta.includes("pts")) return { icon: "points", tone: "amber" };
+  return { icon: "gift", tone: "green" };
+}
 
 export default function RecompensasScreen() {
   const [rewards, setRewards] = useState<RewardSummary[]>([]);
@@ -23,15 +35,22 @@ export default function RecompensasScreen() {
 
         {loading ? <ActivityIndicator color="#0d6efd" /> : null}
 
-        {rewards.map((reward) => (
-          <RewardCard
-            key={reward.id}
-            title={reward.title}
-            description={`${reward.businessName} · ${reward.description}`}
-            meta={reward.meta}
-          />
-        ))}
+        {rewards.map((reward) => {
+          const visual = getRewardVisual(reward);
+
+          return (
+            <RewardCard
+              key={reward.id}
+              title={reward.title}
+              description={`${reward.businessName} - ${reward.description}`}
+              meta={reward.meta}
+              icon={visual.icon}
+              tone={visual.tone}
+            />
+          );
+        })}
       </ScrollView>
+      <BottomTabs />
     </SafeAreaView>
   );
 }

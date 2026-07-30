@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BottomTabs } from "@/components/BottomTabs";
 import { getCurrentSession, signOut } from "@/lib/auth";
 
 export default function PerfilScreen() {
@@ -56,6 +57,7 @@ export default function PerfilScreen() {
           </Link>
         )}
       </View>
+      <BottomTabs />
     </SafeAreaView>
   );
 }
