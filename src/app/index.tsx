@@ -1,179 +1,196 @@
-import { Link, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { BottomTabs } from "@/components/BottomTabs";
-import { getBusinessImage } from "@/lib/business-images";
-import { getBusinesses, type BusinessSummary } from "@/lib/loyloop-data";
-
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { ScrollView, View } from "react-native";
+import { useState } from "react";
+import { CommerceCard } from "@/components/CommerceCard";
+import { LevelBenefitCard } from "@/components/LevelBenefitCard";
+import { ScanQrCta } from "@/components/ScanQrCta";
+import {
+  BrandCard,
+  Button,
+  Empty,
+  Feedback,
+  Icon,
+  IconButton,
+  Screen,
+  SectionHeader,
+  Sheet,
+  Txt,
+  ui,
+} from "@/components/ui/loyloop";
+import { artwork, palette as c } from "@/constants/loyloop";
+import { useResource } from "@/hooks/use-resource";
+import { getBusinesses, getUserProfile } from "@/lib/loyloop-data";
+const load = async () => ({
+  businesses: await getBusinesses(),
+  profile: await getUserProfile(),
+});
 export default function HomeScreen() {
-  const router = useRouter();
-  const [businesses, setBusinesses] = useState<BusinessSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getBusinesses()
-      .then(setBusinesses)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const totalPoints = businesses.reduce((sum, business) => sum + business.points, 0);
-
+  const { data, loading, error, reload } = useResource(load);
+  const [notice, setNotice] = useState(false);
+  const businesses = data?.businesses ?? [];
+  const explore = () =>
+    router.push({ pathname: "/comercios", params: { tab: "explorar" } });
+  const recommended = [...businesses]
+    .filter((b) => !b.sponsored)
+    .sort((a, b) => Number(a.isMember) - Number(b.isMember))
+    .slice(0, 3);
+  const featured = [
+    ...businesses.filter((b) => b.sponsored),
+    ...businesses.filter((b) => !b.sponsored),
+  ].slice(0, 4);
+  const trending = businesses.slice(0, 4);
+  const benefitBusinesses = businesses.filter((b) => !!b.credit).slice(0, 2);
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>Hola</Text>
-          <Pressable style={styles.loginButton} onPress={() => router.push("/login")}>
-            <Text style={styles.loginText}>Entrar</Text>
-          </Pressable>
-          <Text style={styles.title}>Tus comercios</Text>
+    <Screen background={c.canvas} padding={18}>
+      <View
+        style={[ui.row, { justifyContent: "space-between", marginBottom: 8 }]}
+      >
+        <View style={{ flex: 1 }}>
+          <Txt size={22} weight="bold">
+            ¡Hola, {data?.profile.name.split(" ")[0] ?? "Explorador"}!
+          </Txt>
+          <Txt size={11} color={c.muted}>
+            Qué bueno verte de nuevo
+          </Txt>
         </View>
-
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>{totalPoints} puntos</Text>
-          <Text style={styles.heroText}>Recompensas, sellos y creditos en comercios locales.</Text>
+        <IconButton
+          name="notifications-outline"
+          label="Novedades"
+          onPress={() => setNotice(true)}
+        />
+      </View>
+      <Feedback loading={loading && !data} error={error} retry={reload} />
+      {!!recommended.length && (
+        <BrandCard style={{ gap: 14, padding: 20 }}>
+          <View style={[ui.row, { minHeight: 84 }]}>
+            <Txt
+              color="#fff"
+              size={26}
+              weight="bold"
+              style={{ flex: 1, lineHeight: 31 }}
+            >
+              Recomendados{"\n"}para ti
+            </Txt>
+            <Image
+              source={artwork.discover}
+              contentFit="contain"
+              style={{ width: 88, height: 85 }}
+            />
+          </View>
+          <View style={{ gap: 4 }}>
+            {recommended.map((b) => (
+              <CommerceCard key={b.id} business={b} variant="compact" />
+            ))}
+          </View>
+          <Button
+            title="Descubrir más comercios   →"
+            onPress={explore}
+            style={{
+              backgroundColor: "#FFFFFF20",
+              borderWidth: 1,
+              borderColor: "#FFFFFF66",
+            }}
+          />
+          <View style={[ui.row, { justifyContent: "center" }]}>
+            <Icon name="sparkles-outline" color="#fff" size={15} />
+            <Txt color="#fff" size={10}>
+              Nuevos lugares para disfrutar
+            </Txt>
+          </View>
+        </BrandCard>
+      )}
+      <ScanQrCta onPress={() => router.push("/escanear")} />
+      <View style={{ gap: 14 }}>
+        <SectionHeader title="Beneficios de tu nivel LoyLoop" compact />
+        {data?.profile && (
+          <LevelBenefitCard profile={data.profile} variant="home" />
+        )}
+      </View>
+      <View style={{ gap: 16 }}>
+        <SectionHeader
+          title="Tus comercios"
+          compact
+          action="Ver todos →"
+          onPress={() => router.push("/comercios")}
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 12 }}
+        >
+          {businesses
+            .filter((b) => b.isMember)
+            .map((b) => (
+              <CommerceCard key={b.id} business={b} variant="bubble" />
+            ))}
+        </ScrollView>
+        {!loading && !businesses.some((b) => b.isMember) && (
+          <Empty
+            title="Tu próximo lugar favorito te espera"
+            description="Explora comercios y únete para empezar a disfrutar sus beneficios."
+          />
+        )}
+      </View>
+      {!!featured.length && (
+        <View style={{ gap: 15 }}>
+          <SectionHeader
+            title="Destacados"
+            compact
+            action="Ver todos →"
+            onPress={explore}
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 10, paddingBottom: 12 }}
+          >
+            {featured.map((b) => (
+              <CommerceCard key={b.id} business={b} variant="featured" />
+            ))}
+          </ScrollView>
         </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Registrados</Text>
-          <Link href="/comercios">
-            <Text style={styles.linkText}>Ver todos</Text>
-          </Link>
+      )}
+      <View style={{ gap: 15 }}>
+        <SectionHeader
+          title="En tendencia"
+          compact
+          action="Ver todos"
+          onPress={explore}
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {trending.map((b) => (
+            <CommerceCard key={b.id} business={b} variant="trending" />
+          ))}
+        </ScrollView>
+      </View>
+      {!!benefitBusinesses.length && (
+        <View style={{ gap: 14 }}>
+          <SectionHeader
+            title="Más beneficios"
+            compact
+            action="Ver todo →"
+            onPress={() => router.push("/recompensas")}
+          />
+          {benefitBusinesses.map((b) => (
+            <CommerceCard key={b.id} business={b} variant="benefit" />
+          ))}
         </View>
-
-        {loading ? <ActivityIndicator color="#0d6efd" /> : null}
-
-        {businesses.map((business) => (
-          <Link key={business.id} href={`/comercio/${business.slug}`} asChild>
-            <Pressable style={styles.businessCard}>
-              <Image source={getBusinessImage(business.slug)} style={styles.businessImage} />
-              <View style={styles.businessInfo}>
-                <Text style={styles.businessName}>{business.name}</Text>
-                <Text style={styles.businessMeta}>{business.category}</Text>
-              </View>
-              <View style={styles.pointsPill}>
-                <Text style={styles.pointsText}>{business.points} pts</Text>
-                <Text style={styles.creditText}>{business.credit}</Text>
-              </View>
-            </Pressable>
-          </Link>
-        ))}
-      </ScrollView>
-      <BottomTabs />
-    </SafeAreaView>
+      )}
+      <Sheet
+        visible={notice}
+        title="Novedades"
+        onClose={() => setNotice(false)}
+      >
+        <Empty
+          title="Todo al día"
+          description="Aquí encontrarás las novedades de tus comercios y de LoyLoop."
+        />
+      </Sheet>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 110,
-    gap: 12,
-  },
-  header: {
-    position: "relative",
-    minHeight: 64,
-  },
-  eyebrow: {
-    color: "#64748b",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  title: {
-    marginTop: 6,
-    color: "#071225",
-    fontSize: 30,
-    fontWeight: "900",
-  },
-  loginButton: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    borderRadius: 12,
-    backgroundColor: "#0d6efd",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  loginText: {
-    color: "#ffffff",
-    fontWeight: "900",
-  },
-  hero: {
-    borderRadius: 18,
-    backgroundColor: "#0d6efd",
-    padding: 18,
-  },
-  heroTitle: {
-    color: "#ffffff",
-    fontSize: 28,
-    fontWeight: "900",
-  },
-  heroText: {
-    marginTop: 6,
-    color: "#dbeafe",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sectionTitle: {
-    color: "#071225",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  linkText: {
-    color: "#0d6efd",
-    fontWeight: "900",
-  },
-  businessCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#dbe4f0",
-    backgroundColor: "#ffffff",
-    padding: 16,
-    gap: 16,
-  },
-  businessImage: {
-    width: 58,
-    height: 58,
-    borderRadius: 12,
-    backgroundColor: "#e2e8f0",
-  },
-  businessInfo: {
-    flex: 1,
-  },
-  businessName: {
-    color: "#071225",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  businessMeta: {
-    marginTop: 3,
-    color: "#64748b",
-    fontSize: 14,
-  },
-  pointsPill: {
-    alignItems: "flex-end",
-  },
-  pointsText: {
-    color: "#0d6efd",
-    fontWeight: "900",
-  },
-  creditText: {
-    color: "#047857",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-});

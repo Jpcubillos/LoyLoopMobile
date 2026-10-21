@@ -1,0 +1,13 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="56.088" height="56.088" viewBox="0 0 56.088 56.088" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Gold Tier Emblem">
+<path id="Vector" d="M28.044 2.052L49.932 14.706V41.382L28.044 54.036L6.156 41.382V14.706L28.044 2.052Z" fill="url(#paint0_linear_0_113)" stroke-width="2.736" stroke="#FFE983"/>
+<path id="Vector_2" d="M28.044 14.364L31.9428 22.7772L41.04 23.8032L34.3368 30.0276L36.1152 38.988L28.044 34.4736L19.9728 38.988L21.7512 30.0276L15.048 23.8032L24.1452 22.7772L28.044 14.364Z" fill="#FFF3A6" stroke-width="1.368" stroke="#FFCA2F"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_113" x1="6.84" y1="5.472" x2="47.88" y2="50.616" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FFF2A8"/>
+<stop offset="0.5" stop-color="#FFD455"/>
+<stop offset="1" stop-color="#F2A512"/>
+</linearGradient>
+</defs>
+</svg>

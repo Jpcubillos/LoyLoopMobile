@@ -42,3 +42,8 @@ example
 # generated native folders
 /ios
 /android
+
+# Local design exports and verification screenshots
+.design-reference/
+test-results/
+playwright-report/

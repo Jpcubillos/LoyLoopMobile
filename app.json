@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LoyLoopMobile",
+    "name": "LoyLoop",
     "slug": "LoyLoopMobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -33,11 +33,30 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FF6B6B",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LoyLoop usa tu cámara para escanear el QR de los comercios.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Elige una imagen para tu perfil de LoyLoop.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

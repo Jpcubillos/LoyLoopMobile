@@ -1,78 +1,177 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { BottomTabs } from "@/components/BottomTabs";
-import type { LoyIconName } from "@/components/LoyIcon";
-import { RewardCard } from "@/components/RewardCard";
-import { getRewards, type RewardSummary } from "@/lib/loyloop-data";
-
-function getRewardVisual(reward: RewardSummary): { icon: LoyIconName; tone: "blue" | "green" | "amber" } {
-  const title = reward.title.toLowerCase();
-  const meta = reward.meta.toLowerCase();
-
-  if (title.includes("descuento") || meta.includes("%")) return { icon: "percent", tone: "blue" };
-  if (title.includes("credito") || meta.includes("$")) return { icon: "wallet", tone: "green" };
-  if (title.includes("puntos") || meta.includes("pts")) return { icon: "points", tone: "amber" };
-  return { icon: "gift", tone: "green" };
-}
-
-export default function RecompensasScreen() {
-  const [rewards, setRewards] = useState<RewardSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getRewards()
-      .then(setRewards)
-      .finally(() => setLoading(false));
-  }, []);
-
+import { Image } from "expo-image";
+import { useState } from "react";
+import { ScrollView, View } from "react-native";
+import {
+  MissionCard,
+  PromotionCard,
+  RewardCard,
+} from "@/components/RewardCard";
+import { LevelBenefitCard } from "@/components/LevelBenefitCard";
+import { SortOrder, SortTrigger } from "@/components/CommerceControls";
+import {
+  BrandCard,
+  Empty,
+  Feedback,
+  Header,
+  Screen,
+  SectionHeader,
+  Tabs,
+  Txt,
+  ui,
+} from "@/components/ui/loyloop";
+import { artwork } from "@/constants/loyloop";
+import { useResource } from "@/hooks/use-resource";
+import { getRewards, getUserProfile } from "@/lib/loyloop-data";
+const load = async () => ({
+  offers: await getRewards(),
+  profile: await getUserProfile(),
+});
+const tabs = ["Todos", "Recompensas", "Promociones", "Misiones"] as const;
+export default function BeneficiosScreen() {
+  const [tab, setTab] = useState<(typeof tabs)[number]>("Todos");
+  const [sort, setSort] = useState<SortOrder>("Disponibles primero");
+  const { data, error, loading, reload } = useResource(load);
+  const offers = (data?.offers ?? [])
+    .slice()
+    .sort((a, b) =>
+      sort === "Nombre"
+        ? a.title.localeCompare(b.title)
+        : Number(b.available) - Number(a.available),
+    );
+  const available = offers.filter((o) => o.available && o.kind !== "promotion");
+  const rewards = offers.filter(
+    (o) => o.kind === "reward" || o.kind === "benefit",
+  );
+  const promotions = offers.filter((o) => o.kind === "promotion");
+  const missions = offers.filter((o) => o.kind === "mission");
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Recompensas</Text>
-        <Text style={styles.subtitle}>Beneficios activos en tus comercios.</Text>
-
-        {loading ? <ActivityIndicator color="#0d6efd" /> : null}
-
-        {rewards.map((reward) => {
-          const visual = getRewardVisual(reward);
-
-          return (
-            <RewardCard
-              key={reward.id}
-              title={reward.title}
-              description={`${reward.businessName} - ${reward.description}`}
-              meta={reward.meta}
-              icon={visual.icon}
-              tone={visual.tone}
+    <Screen>
+      <Header
+        title="Beneficios"
+        subtitle="Todo lo que tienes para ganar y disfrutar"
+      />
+      {data && (
+        <BrandCard style={{ padding: 16 }}>
+          <View style={ui.row}>
+            <View style={{ flex: 1, gap: 8 }}>
+              <Txt weight="semibold" size={17} color="#fff">
+                Hola, {data.profile.name.split(" ")[0]} 👋
+              </Txt>
+              <Txt size={11} color="#FFFFFFDD">
+                Aquí están tus beneficios
+              </Txt>
+              <View style={[ui.row, { gap: 20, marginTop: 8 }]}>
+                <Txt color="#fff" size={13} weight="semibold">
+                  {available.length}
+                  {"\n"}disponibles
+                </Txt>
+                <Txt color="#fff" size={13} weight="semibold">
+                  {rewards.filter((o) => !o.available).length}
+                  {"\n"}por desbloquear
+                </Txt>
+              </View>
+            </View>
+            <Image
+              source={artwork.gift}
+              contentFit="contain"
+              style={{ width: 104, height: 130 }}
             />
-          );
-        })}
-      </ScrollView>
-      <BottomTabs />
-    </SafeAreaView>
+          </View>
+        </BrandCard>
+      )}
+      <Tabs items={tabs} value={tab} onChange={setTab} />
+      <SortTrigger
+        value={sort}
+        onChange={setSort}
+        options={["Disponibles primero", "Nombre"]}
+      />
+      <Feedback loading={loading && !data} error={error} retry={reload} />
+      {tab === "Todos" && (
+        <>
+          <SectionHeader
+            title="Beneficios disponibles"
+            action="Ver todos"
+            onPress={() => setTab("Recompensas")}
+          />
+          {available.length ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 12 }}
+            >
+              {available.map((o) => (
+                <RewardCard key={o.id} offer={o} variant="featured" />
+              ))}
+            </ScrollView>
+          ) : (
+            <Empty
+              title="Tu siguiente beneficio está cerca"
+              description="Participa en tus comercios para desbloquear recompensas."
+            />
+          )}
+          {data && <LevelBenefitCard profile={data.profile} />}
+        </>
+      )}
+      {(tab === "Todos" || tab === "Misiones") && (
+        <View style={{ gap: 12 }}>
+          <SectionHeader
+            title="Misiones en curso"
+            action={tab === "Todos" ? "Ver todas" : undefined}
+            onPress={() => setTab("Misiones")}
+          />
+          {(tab === "Todos" ? missions.slice(0, 2) : missions).map((o) => (
+            <MissionCard key={o.id} offer={o} />
+          ))}
+          {!missions.length && (
+            <Empty
+              title="Aún no tienes misiones"
+              description="Las misiones de tus comercios aparecerán aquí."
+            />
+          )}
+        </View>
+      )}
+      {(tab === "Todos" || tab === "Promociones") && (
+        <View style={{ gap: 12 }}>
+          <SectionHeader
+            title="Promociones"
+            action={tab === "Todos" ? "Ver todas" : undefined}
+            onPress={() => setTab("Promociones")}
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12 }}
+          >
+            {promotions.map((o) => (
+              <PromotionCard
+                key={o.id}
+                offer={o}
+                variant={tab === "Todos" ? "compact" : "vertical"}
+              />
+            ))}
+          </ScrollView>
+          {!promotions.length && (
+            <Empty
+              title="Nuevas oportunidades pronto"
+              description="Aquí verás las promociones de tus comercios."
+            />
+          )}
+        </View>
+      )}
+      {tab === "Recompensas" && (
+        <View style={{ gap: 12 }}>
+          <SectionHeader title="Tus beneficios y recompensas" />
+          {rewards.map((o) => (
+            <RewardCard key={o.id} offer={o} />
+          ))}
+          {!rewards.length && (
+            <Empty
+              title="Descubre lo que puedes ganar"
+              description="Únete a comercios para empezar a progresar."
+            />
+          )}
+        </View>
+      )}
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 110,
-    gap: 14,
-  },
-  title: {
-    color: "#071225",
-    fontSize: 30,
-    fontWeight: "900",
-  },
-  subtitle: {
-    color: "#64748b",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-});

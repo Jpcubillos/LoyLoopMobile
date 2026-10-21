@@ -1,135 +1,116 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { BottomTabs } from "@/components/BottomTabs";
-
+import { router } from "expo-router";
+import { useRef, useState } from "react";
+import { Linking, TextInput, View } from "react-native";
+import {
+  Button,
+  Feedback,
+  Header,
+  Icon,
+  Screen,
+  Txt,
+  ui,
+} from "@/components/ui/loyloop";
+import { palette as c } from "@/constants/loyloop";
+import { parseCommerceQr } from "@/lib/loyalty-rules";
+import { getBusinessDetail } from "@/lib/loyloop-data";
 export default function EscanearScreen() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [lastCode, setLastCode] = useState("");
-  const [locked, setLocked] = useState(false);
-
-  if (!permission) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <Text style={styles.text}>Preparando camara...</Text>
-      </SafeAreaView>
-    );
+  const [manual, setManual] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const locked = useRef(false);
+  async function scan(value: string) {
+    if (locked.current) return;
+    locked.current = true;
+    setError("");
+    const slug = parseCommerceQr(value);
+    if (!slug) {
+      setError("Este QR no corresponde a un comercio de LoyLoop.");
+      locked.current = false;
+      return;
+    }
+    setBusy(true);
+    try {
+      await getBusinessDetail(slug);
+      router.replace(`/comercio/${slug}`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No encontramos el comercio.",
+      );
+      locked.current = false;
+    } finally {
+      setBusy(false);
+    }
   }
-
-  if (!permission.granted) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <Text style={styles.title}>Escanear QR</Text>
-        <Text style={styles.text}>Necesitamos permiso de camara para leer codigos QR.</Text>
-        <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Dar permiso</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Escanear</Text>
-        <Text style={styles.text}>Apunta al QR del comercio o del cliente.</Text>
-
-        <View style={styles.cameraFrame}>
+    <Screen tabs={false}>
+      <Header
+        title="Únete con QR"
+        subtitle="Escanea el código del comercio y empieza a disfrutar sus beneficios."
+        back
+      />
+      <View
+        style={{
+          aspectRatio: 1,
+          backgroundColor: "#101F3C",
+          borderRadius: 28,
+          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {permission?.granted ? (
           <CameraView
-            style={styles.camera}
+            style={{ width: "100%", height: "100%" }}
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             onBarcodeScanned={({ data }) => {
-              if (locked) return;
-              setLocked(true);
-              setLastCode(data);
+              void scan(data);
             }}
           />
-        </View>
-
-        <View style={styles.resultBox}>
-          <Text style={styles.resultLabel}>Ultimo codigo</Text>
-          <Text style={styles.resultText}>{lastCode || "Sin lectura todavia"}</Text>
-        </View>
-
-        {locked ? (
-          <Pressable style={styles.button} onPress={() => setLocked(false)}>
-            <Text style={styles.buttonText}>Escanear otro</Text>
-          </Pressable>
-        ) : null}
+        ) : (
+          <View style={{ padding: 28, alignItems: "center", gap: 18 }}>
+            <Icon name="qr-code-outline" color="#fff" size={72} />
+            <Txt color="#fff" style={{ textAlign: "center" }}>
+              Permite el acceso a la cámara para escanear el QR.
+            </Txt>
+            <Button
+              title={
+                permission && !permission.canAskAgain
+                  ? "Abrir ajustes"
+                  : "Activar cámara"
+              }
+              onPress={() => {
+                if (permission && !permission.canAskAgain)
+                  void Linking.openSettings();
+                else void requestPermission();
+              }}
+            />
+          </View>
+        )}
       </View>
-      <BottomTabs />
-    </SafeAreaView>
+      <Feedback loading={busy} error={error} />
+      <Txt size={12} color={c.muted} style={{ textAlign: "center" }}>
+        Encontrarás el QR en caja, en una mesa o en la recepción del comercio.
+      </Txt>
+      <View style={[ui.card, { gap: 12 }]}>
+        <Txt weight="semibold">¿Tienes el enlace o código del comercio?</Txt>
+        <TextInput
+          accessibilityLabel="Enlace o código del comercio"
+          placeholder="Ej. cafe-central"
+          placeholderTextColor={c.muted}
+          value={manual}
+          onChangeText={setManual}
+          autoCapitalize="none"
+          style={ui.input}
+        />
+        <Button
+          title="Buscar comercio"
+          variant="secondary"
+          disabled={!manual.trim() || busy}
+          onPress={() => scan(manual)}
+        />
+      </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#f8fafc",
-    gap: 14,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    paddingBottom: 110,
-    gap: 14,
-  },
-  title: {
-    color: "#071225",
-    fontSize: 30,
-    fontWeight: "900",
-  },
-  text: {
-    color: "#64748b",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  cameraFrame: {
-    overflow: "hidden",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#dbe4f0",
-    backgroundColor: "#0f172a",
-    aspectRatio: 1,
-  },
-  camera: {
-    flex: 1,
-  },
-  resultBox: {
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    padding: 16,
-  },
-  resultLabel: {
-    color: "#64748b",
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  resultText: {
-    marginTop: 8,
-    color: "#071225",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  button: {
-    borderRadius: 12,
-    backgroundColor: "#0d6efd",
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontWeight: "900",
-    textAlign: "center",
-  },
-});

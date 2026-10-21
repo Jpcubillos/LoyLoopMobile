@@ -1,166 +1,119 @@
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
+import { TextInput, View } from "react-native";
+import {
+  Button,
+  Feedback,
+  Header,
+  Icon,
+  Screen,
+  Tabs,
+  Txt,
+  ui,
+} from "@/components/ui/loyloop";
+import { palette as c } from "@/constants/loyloop";
 import { signInWithEmail, signUpWithEmail } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function LoginScreen() {
-  const router = useRouter();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"Entrar" | "Crear cuenta">("Entrar");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [loading, setLoading] = useState(false);
-
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
   async function submit() {
+    setError("");
+    setMessage("");
     if (!isSupabaseConfigured) {
-      setFeedback("Primero llena EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY en .env.");
+      setError("El acceso no está disponible en esta demostración.");
       return;
     }
-
-    setLoading(true);
-    setFeedback("");
-
-    const result = mode === "login"
-      ? await signInWithEmail(email, password)
-      : await signUpWithEmail(email, password);
-
-    setLoading(false);
-
-    if (result.error) {
-      setFeedback(result.error.message);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Ingresa un correo válido.");
       return;
     }
-
-    setFeedback(mode === "signup" ? "Cuenta creada." : "Sesion iniciada.");
-    router.replace("/");
+    setBusy(true);
+    try {
+      const result =
+        mode === "Entrar"
+          ? await signInWithEmail(email, password)
+          : await signUpWithEmail(email, password);
+      if (result.error) throw result.error;
+      if (result.data.session) router.replace("/");
+      else
+        setMessage(
+          "Revisa tu correo para confirmar tu cuenta. Después podrás iniciar sesión.",
+        );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No pudimos iniciar sesión. Inténtalo nuevamente.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.card}>
-        <Text style={styles.kicker}>LoyLoop</Text>
-        <Text style={styles.title}>{mode === "login" ? "Entrar" : "Crear cuenta"}</Text>
-        <Text style={styles.text}>Accede como cliente para ver comercios, sellos y recompensas.</Text>
-
-        <View style={styles.segment}>
-          <Pressable style={[styles.segmentButton, mode === "login" && styles.segmentActive]} onPress={() => setMode("login")}>
-            <Text style={[styles.segmentText, mode === "login" && styles.segmentTextActive]}>Entrar</Text>
-          </Pressable>
-          <Pressable style={[styles.segmentButton, mode === "signup" && styles.segmentActive]} onPress={() => setMode("signup")}>
-            <Text style={[styles.segmentText, mode === "signup" && styles.segmentTextActive]}>Crear cuenta</Text>
-          </Pressable>
+    <Screen tabs={false}>
+      <Header title="LoyLoop" back />
+      <View style={{ gap: 24, paddingTop: 32 }}>
+        <Icon name="sparkles-outline" size={42} />
+        <Txt size={29} weight="bold">
+          Tus lugares favoritos,{"\n"}más cerca de ti.
+        </Txt>
+        <Txt color={c.muted}>
+          Descubre comercios, desbloquea beneficios y encuentra razones para
+          volver.
+        </Txt>
+        <Tabs
+          items={["Entrar", "Crear cuenta"] as const}
+          value={mode}
+          onChange={setMode}
+        />
+        <View style={{ gap: 10 }}>
+          <Txt weight="medium">Correo electrónico</Txt>
+          <TextInput
+            accessibilityLabel="Correo electrónico"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoComplete="email"
+            autoCapitalize="none"
+            placeholder="tu@correo.com"
+            placeholderTextColor={c.muted}
+            style={ui.input}
+          />
         </View>
-
-        <TextInput
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="Correo"
-          placeholderTextColor="#94a3b8"
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
+        <View style={{ gap: 10 }}>
+          <Txt weight="medium">Contraseña</Txt>
+          <TextInput
+            accessibilityLabel="Contraseña"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete={
+              mode === "Entrar" ? "current-password" : "new-password"
+            }
+            style={ui.input}
+          />
+        </View>
+        <Feedback error={error} />
+        {!!message && <Txt color="#008957">{message}</Txt>}
+        <Button
+          title={mode}
+          onPress={submit}
+          loading={busy}
+          disabled={!email || password.length < 6}
         />
-        <TextInput
-          placeholder="Contrasena"
-          placeholderTextColor="#94a3b8"
-          secureTextEntry
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
+        <Button
+          title="Seguir explorando"
+          variant="ghost"
+          onPress={() => router.replace("/")}
         />
-
-        {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
-
-        <Pressable style={styles.button} onPress={submit} disabled={loading || !email || !password}>
-          {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>{mode === "login" ? "Entrar" : "Crear cuenta"}</Text>}
-        </Pressable>
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#f8fafc",
-  },
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#dbe4f0",
-    backgroundColor: "#ffffff",
-    padding: 20,
-    gap: 14,
-  },
-  kicker: {
-    color: "#0d6efd",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  title: {
-    color: "#071225",
-    fontSize: 32,
-    fontWeight: "900",
-  },
-  text: {
-    color: "#64748b",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  segment: {
-    flexDirection: "row",
-    borderRadius: 12,
-    backgroundColor: "#f1f5f9",
-    padding: 4,
-  },
-  segmentButton: {
-    flex: 1,
-    borderRadius: 9,
-    paddingVertical: 10,
-  },
-  segmentActive: {
-    backgroundColor: "#ffffff",
-  },
-  segmentText: {
-    color: "#64748b",
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  segmentTextActive: {
-    color: "#0d6efd",
-  },
-  input: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#dbe4f0",
-    backgroundColor: "#f8fafc",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: "#071225",
-    fontSize: 16,
-  },
-  feedback: {
-    borderRadius: 12,
-    backgroundColor: "#eff6ff",
-    padding: 12,
-    color: "#1e40af",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  button: {
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: "#0d6efd",
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontWeight: "900",
-  },
-});

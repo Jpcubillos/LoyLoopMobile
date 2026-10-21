@@ -1,143 +1,153 @@
-import { Link } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { BottomTabs } from "@/components/BottomTabs";
-import { LoyIcon } from "@/components/LoyIcon";
-import { getBusinesses, type BusinessSummary } from "@/lib/loyloop-data";
-import { getBusinessImage } from "@/lib/business-images";
-
+import { useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, View } from "react-native";
+import { CommerceCard } from "@/components/CommerceCard";
+import {
+  CategoryChip,
+  Locations,
+  SortOrder,
+  SortTrigger,
+} from "@/components/CommerceControls";
+import {
+  Empty,
+  Feedback,
+  Header,
+  Screen,
+  SearchField,
+  SectionHeader,
+  Sheet,
+  Tabs,
+} from "@/components/ui/loyloop";
+import { useResource } from "@/hooks/use-resource";
+import { getBusinesses } from "@/lib/loyloop-data";
 export default function ComerciosScreen() {
-  const [businesses, setBusinesses] = useState<BusinessSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<"Mis comercios" | "Explorar">(
+    params.tab === "explorar" ? "Explorar" : "Mis comercios",
+  );
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("Todos");
+  const [sort, setSort] = useState<SortOrder>("Más usados");
+  const [map, setMap] = useState(false);
+  const { data = [], loading, error, reload } = useResource(getBusinesses);
   useEffect(() => {
-    getBusinesses()
-      .then(setBusinesses)
-      .finally(() => setLoading(false));
-  }, []);
-
+    if (params.tab)
+      setTab(params.tab === "explorar" ? "Explorar" : "Mis comercios");
+  }, [params.tab]);
+  const filtered = useMemo(() => {
+    const normalize = (v: string) =>
+      v
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    return data
+      .filter(
+        (b) =>
+          (tab === "Explorar" || b.isMember) &&
+          (category === "Todos" ||
+            tab === "Mis comercios" ||
+            b.category === category) &&
+          normalize(`${b.name} ${b.category}`).includes(normalize(query)),
+      )
+      .sort((a, b) =>
+        sort === "Nombre"
+          ? a.name.localeCompare(b.name)
+          : sort === "Mejor calificados"
+            ? (b.rating ?? 0) - (a.rating ?? 0)
+            : sort === "Más cercanos"
+              ? (a.distance ?? Infinity) - (b.distance ?? Infinity)
+              : b.points - a.points,
+      );
+  }, [data, tab, query, category, sort]);
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Comercios</Text>
-        <Text style={styles.subtitle}>Explora los negocios donde puedes acumular beneficios.</Text>
-
-        {loading ? <ActivityIndicator color="#0d6efd" /> : null}
-
-        {businesses.map((business) => (
-          <Link key={business.id} href={`/comercio/${business.slug}`} asChild>
-            <Pressable style={styles.card}>
-              <View style={styles.cardHeader}>
-              <Image source={getBusinessImage(business.slug)} style={styles.storeImage} />
-                <View style={styles.cardTitleWrap}>
-                  <Text style={styles.name}>{business.name}</Text>
-                  <Text style={styles.category}>{business.category}</Text>
-                </View>
-                <Text style={styles.chevron}>{">"}</Text>
-              </View>
-              <Text style={styles.description}>{business.description}</Text>
-              <View style={styles.footer}>
-                <Text style={styles.address}>{business.address}</Text>
-                <View style={styles.pointsPill}>
-                  <LoyIcon name="points" color="#b45309" size={20} />
-                  <Text style={styles.points}>{business.points} pts</Text>
-                </View>
-              </View>
-            </Pressable>
-          </Link>
+    <Screen padding={16}>
+      <Header title="Comercios" />
+      <Tabs
+        items={["Mis comercios", "Explorar"] as const}
+        value={tab}
+        onChange={setTab}
+      />
+      <SearchField
+        value={query}
+        onChange={setQuery}
+        placeholder={
+          tab === "Mis comercios"
+            ? "Buscar en mis comercios…"
+            : "Encuentra tu próximo lugar favorito…"
+        }
+      />
+      <SortTrigger value={sort} onChange={setSort} />
+      {tab === "Explorar" && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {["Todos", ...new Set(data.map((b) => b.category))].map((label) => (
+            <CategoryChip
+              key={label}
+              label={label}
+              active={category === label}
+              onPress={() => setCategory(label)}
+            />
+          ))}
+        </ScrollView>
+      )}
+      <Feedback loading={loading} error={error} retry={reload} />
+      {tab === "Explorar" && filtered.some((b) => b.sponsored) && (
+        <View style={{ gap: 12 }}>
+          <SectionHeader title="Comercios destacados" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 10 }}
+          >
+            {filtered
+              .filter((b) => b.sponsored)
+              .map((b) => (
+                <CommerceCard key={b.id} business={b} variant="featured" />
+              ))}
+          </ScrollView>
+        </View>
+      )}
+      <SectionHeader
+        title={
+          tab === "Mis comercios"
+            ? `Tus comercios (${filtered.length})`
+            : "Descubre nuevos lugares"
+        }
+        action="Ver mapa"
+        onPress={() => setMap(true)}
+      />
+      <View style={{ gap: 10 }}>
+        {filtered.map((b) => (
+          <CommerceCard key={b.id} business={b} />
         ))}
-      </ScrollView>
-      <BottomTabs />
-    </SafeAreaView>
+      </View>
+      {!loading && !error && !filtered.length && (
+        <Empty
+          title={
+            query ? "No encontramos coincidencias" : "Aquí empieza tu comunidad"
+          }
+          description={
+            query
+              ? "Prueba con otro nombre o categoría."
+              : "Explora un comercio o escanea su QR para unirte."
+          }
+        />
+      )}
+      <Sheet visible={map} title="Ubicaciones" onClose={() => setMap(false)}>
+        <Locations
+          locations={filtered
+            .filter((b) => b.address)
+            .map((b) => ({
+              id: b.id,
+              name: b.name,
+              address: b.address,
+              distance: b.distance,
+            }))}
+        />
+      </Sheet>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 110,
-    gap: 14,
-  },
-  title: {
-    color: "#071225",
-    fontSize: 30,
-    fontWeight: "900",
-  },
-  subtitle: {
-    color: "#64748b",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#dbe4f0",
-    backgroundColor: "#ffffff",
-    padding: 16,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  storeImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: "#eff6ff",
-  },
-  cardTitleWrap: {
-    flex: 1,
-  },
-  chevron: {
-    color: "#94a3b8",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-  name: {
-    color: "#071225",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  category: {
-    marginTop: 2,
-    color: "#0d6efd",
-    fontWeight: "800",
-  },
-  description: {
-    marginTop: 8,
-    color: "#64748b",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  footer: {
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  address: {
-    flex: 1,
-    color: "#64748b",
-    fontSize: 12,
-  },
-  points: {
-    color: "#b45309",
-    fontWeight: "900",
-  },
-  pointsPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    backgroundColor: "#fffbeb",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-});
